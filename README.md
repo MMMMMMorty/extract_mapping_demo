@@ -1,5 +1,7 @@
 # This is a Demo
 
+This demo is not general now, it just for the template created by "helm create <project_name>"
+
 ## Problem
 
 Mapping file contains mapping of every field in the object from the templated chart to the original file and line.
@@ -9,6 +11,14 @@ Source: [issue](https://github.com/helm/helm/issues/11552)
 ## Run
 
 Go version: 1.20
+
+    # install helm first
+
+    helm create <project_name>
+
+    git clone git@github.com:MMMMMMorty/extract_mapping_demo.git
+
+    cd src
 
     go run . -p <project_dir_path> -o <result_dir_path>
 
