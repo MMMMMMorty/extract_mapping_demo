@@ -104,8 +104,10 @@ func parseFile(path string) error {
 	node := new(Node)
 	objectID := new(ObjectID)
 	// fields := make(map[int]string)
-	fields := make([]string, 10)
+	fields := make([]string, 15)
 	realLen := 0
+	lastHierarchy := -1
+	arrayNumber := 0
 	for _, line := range lines {
 		soueceFileRe := regexp.MustCompile(SOURCE_FILE_PATTERN)
 		apiVersionRe := regexp.MustCompile(API_VERSION_PATTERN)
@@ -123,6 +125,8 @@ func parseFile(path string) error {
 			node = new(Node)
 			objectID = new(ObjectID)
 			node.file = fileName
+			lastHierarchy = -1
+			arrayNumber = 0
 			isEmpty = true
 			continue
 		}
@@ -162,17 +166,26 @@ func parseFile(path string) error {
 			// index <= real_len(fields)
 			// delete the old and add the new
 			// write to the file
+			if index != lastHierarchy {
+				index = index - arrayNumber
+			} else {
+				lastHierarchy = -1
+				arrayNumber = 0
+			}
 			if index == realLen {
 				fields[index] = key
 				realLen = realLen + 1
 			} else if index <= realLen-1 {
-				tempField := make([]string, 10)
+				tempField := make([]string, 15)
 				copy(tempField, fields[0:index])
 				fields = tempField
 				fields[index] = key
 				realLen = index + 1
 			} else if index == realLen+1 { // - name:
-				fields[index-1] = key
+				// change to set delay = 0, recoveryLayer = last layer of the array
+				fields[realLen] = key
+				lastHierarchy = realLen - 1
+				arrayNumber = 1
 				realLen = realLen + 1
 			} else {
 				err := fmt.Errorf("Something wrong with the yaml format")
@@ -198,6 +211,12 @@ func parseFile(path string) error {
 			if err != nil {
 				return err
 			}
+			if index != lastHierarchy {
+				index = index - arrayNumber
+			} else {
+				lastHierarchy = -1
+				arrayNumber = 0
+			}
 			// check index == real_len(fields)
 			// add the new
 			// index <= real_len(fields) -1
@@ -206,7 +225,10 @@ func parseFile(path string) error {
 				fields[index] = key
 				realLen = realLen + 1
 			} else if index <= realLen-1 {
-				tempField := make([]string, 10)
+				tempField := make([]string, 15)
+				if index == -1 {
+					continue
+				}
 				copy(tempField, fields[0:index])
 				fields = tempField
 				fields[index] = key
@@ -236,6 +258,12 @@ func parseFile(path string) error {
 				err := fmt.Errorf("There is no objectID info")
 				return err
 			}
+			if index != lastHierarchy {
+				index = index - arrayNumber
+			} else {
+				lastHierarchy = -1
+				arrayNumber = 0
+			}
 			// check index = real_len(fields) +1 || index = real_len(fields)
 			//writeNode
 			//writeToFile
@@ -244,7 +272,7 @@ func parseFile(path string) error {
 				fields[index] = key
 				realLen = realLen + 1
 			} else if index == realLen-1 {
-				tempField := make([]string, 10)
+				tempField := make([]string, 15)
 				copy(tempField, fields[0:index])
 				fields = tempField
 				fields[index] = key
