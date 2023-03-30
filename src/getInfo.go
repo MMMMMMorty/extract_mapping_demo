@@ -67,7 +67,7 @@ func getInfo(dirPath string) error {
 			out, _ := Exec(yqCommand)
 			if out != nil {
 				output := out.String()
-				fmt.Println(output)
+				// fmt.Println(output)
 				path := extractParameter(rePath, output, "$path")
 				//if path is empty, continue
 				if path != "" && path != "\"\"" {
