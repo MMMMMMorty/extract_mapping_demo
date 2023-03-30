@@ -27,13 +27,13 @@ func main() {
 	}
 	out, err := exec.Command("/bin/helm", "template", path, "--debug").Output()
 	if err != nil {
-		log.Fatalf("Command: %s", err)
+		log.Fatalf("Helm template command: %s", err.Error())
 	}
 	err = writeToFile(resultPath, string(out))
 	if err != nil {
-		log.Fatalf("writeToFile: %s", err)
+		log.Fatalf("wWiteToFile: %s", err)
 	}
-	err = parseFile(resultPath)
+	err = getInfo(resultPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func main() {
 }
 
 func writeToFile(resultPath string, context string) error {
-	resultPath = resultPath + "/example.txt"
+	resultPath = resultPath + "/example.yaml"
 	file, err := os.OpenFile(resultPath, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		return nil
@@ -52,6 +52,7 @@ func writeToFile(resultPath string, context string) error {
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
+	//split the file to different source
 	writer.WriteString(context)
 
 	writer.Flush()

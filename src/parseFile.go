@@ -14,9 +14,9 @@ const (
 	SOURCE_FILE_PATTERN        = `(?m)Source: (\S*)/(?P<fileName>[\w-_]*\.yaml)$`
 	API_VERSION_PATTERN        = `(?m)apiVersion: (?P<apiVersion>\S*) #This is the (?P<line>[0-9]+) line in (?P<fileName>\S+)\.yaml(.*)$`
 	KIND_PATTERN               = `(?m)kind: (?P<kind>\S*) #This is the (?P<line>[0-9]+) line in (?P<fileName>\S+)\.yaml(.*)$`
-	VALUE_LINE_COMMENT_PATTERN = `(?m)(?P<hierarchy>[ |-]*)(?P<key>\S+): (?P<value>\S+) #This is the (?P<line>[0-9]+) line in (?P<fileName>\S+).yaml(.*)$`
+	VALUE_LINE_COMMENT_PATTERN = `(?m)(?P<hierarchy>[ |-]*)(?P<key>\S+): (?P<value>[\S|\\]+) #This is the (?P<line>[0-9]+) line in (?P<fileName>\S+).yaml(.*)$`
 	LINE_COMMENT_PATTERN       = `(?m)(?P<hierarchy>[ |-]*)(?P<key>\S+): #This is the (?P<line>[0-9]+) line in (?P<fileName>\S+).yaml(.*)$`
-	VALUE_LINE_PATTERN         = `(?m)(?P<hierarchy>[ |-]*)(?P<key>\S+): (?P<value>\S+)(.*)$`
+	VALUE_LINE_PATTERN         = `(?m)(?P<hierarchy>[ |-]*)(?P<key>\S+): (?P<value>[\S|\\]+)(.*)$`
 )
 
 type ObjectID struct {
