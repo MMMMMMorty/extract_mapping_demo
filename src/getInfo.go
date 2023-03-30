@@ -60,7 +60,8 @@ func getInfo(dirPath string) error {
 			isEmpty = false
 			continue
 		} else if isEmpty == false {
-			index = index - 3 // not sure if it can go to the end
+			// not sure if it can go to the end
+			index = index - 3
 			command := `'[..| select(line == ` + strconv.Itoa(index) + `)| {"destpath": path | join("."),"type": type,"value": .}]'`
 			yqCommand := fmt.Sprintf("yq %s %s", command, resultPath)
 			out, _ := Exec(yqCommand)
@@ -68,86 +69,60 @@ func getInfo(dirPath string) error {
 				output := out.String()
 				fmt.Println(output)
 				path := extractParameter(rePath, output, "$path")
-				pathType := extractParameter(reType, output, "$type")
 				//if path is empty, continue
 				if path != "" && path != "\"\"" {
 					if isEmpty == true {
 						err := fmt.Errorf("There is no objectID info")
 						return err
 					}
-					// fmt.Println(path)
-					mapMatched, err := regexp.MatchString(`!!map`, pathType)
-					if err != nil {
-						err = fmt.Errorf("regexp.MatchString err: %s", err.Error())
-					}
-					seqMatched, err := regexp.MatchString(`!!seq`, pathType)
-					if err != nil {
-						err = fmt.Errorf("regexp.MatchString err: %s", err.Error())
-					}
-					//if type == map. it must have two paths
-					if mapMatched || seqMatched { // the line number is not correct when it is map
-						//split first
-						//loop
-						value, lineNumber, newLastNumber, err := getInfoFromOne(reValue, reLine, output, lastNumber, true)
-						if err != nil {
-							err = fmt.Errorf("getInfoFromOne wrong err: %s", err.Error())
-						}
-						lastNumber = newLastNumber
-						node = writeInfoToNode(node, objectID, path, lineNumber, value)
-						err = node.writeNodeToFile(dirPath)
-						if err != nil {
-							err = fmt.Errorf("node.writeToFile wrong err: %s", err.Error())
-							return err
-						}
-						// cut it to two parts, with path
-						split := strings.Split(output, "- dest")
-						// fmt.Println(split)
-						if len(split) >= 3 {
-							if len(split) > 3 {
-								fmt.Println(len(split)) //- apiGroups: ["networking.k8s.io"]
-							}
-							secondOutput := split[2] // only the one after the map
-							path := extractParameter(rePath, secondOutput, "$path")
-							// fmt.Println(path)
-							value, lineNumber, newLastNumber, err := getInfoFromOne(reValue, reLine, secondOutput, lastNumber, false)
-							if err != nil {
-								err = fmt.Errorf("getInfoFromOne wrong err: %s", err.Error())
-							}
-							lastNumber = newLastNumber
-							node = writeInfoToNode(node, objectID, path, lineNumber, value)
-							err = node.writeNodeToFile(dirPath)
-							if err != nil {
-								err = fmt.Errorf("node.writeToFile wrong err: %s", err.Error())
-								return err
-							}
-							fmt.Println(value)
-							// fmt.Println(lineNumber)
-							// same as the below one
-						} else if len(split) == 2 {
-							continue
-						} else {
-							err := fmt.Errorf("strings.Split wrong, check the format of the output")
-							return err
-						}
+					splits := strings.Split(output, "- dest")
+					if len(splits) < 2 {
+						err := fmt.Errorf("Something wrong with the length of the splits, which is %d", len(splits))
+						return err
 					} else {
-						value, lineNumber, newLastNumber, err := getInfoFromOne(reValue, reLine, output, lastNumber, false)
-						if err != nil {
-							err = fmt.Errorf("getInfoFromOne wrong err: %s", err.Error())
+						// cut the redundant one
+						splits = splits[1:]
+						for _, split := range splits {
+							path := extractParameter(rePath, split, "$path")
+							pathType := extractParameter(reType, split, "$type")
+							mapMatched, err := regexp.MatchString(`!!map`, pathType)
+							if err != nil {
+								err = fmt.Errorf("regexp.MatchString err: %s", err.Error())
+							}
+							if mapMatched {
+								err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, true)
+								if err != nil {
+									err = fmt.Errorf("map type: writeNodeToFile wrong err: %s", err.Error())
+								}
+							} else {
+								err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, false)
+								if err != nil {
+									err = fmt.Errorf("not map type: writeNodeToFile wrong err: %s", err.Error())
+								}
+							}
+
 						}
-						lastNumber = newLastNumber
-						node = writeInfoToNode(node, objectID, path, lineNumber, value)
-						err = node.writeNodeToFile(dirPath)
-						if err != nil {
-							err = fmt.Errorf("node.writeToFile wrong err: %s", err.Error())
-							return err
-						}
-						fmt.Println(value)
-						// fmt.Println(lineNumber)
 					}
 				}
 			}
 
 		}
+	}
+	return nil
+}
+
+func writeNodeToFile(reValue *regexp.Regexp, reLine *regexp.Regexp, split string, lastNumber int, path string, dirPath string, node *Node, objectID *ObjectID, isMapType bool) error {
+	value, lineNumber, newLastNumber, err := getInfoFromOne(reValue, reLine, split, lastNumber, isMapType)
+	if err != nil {
+		err = fmt.Errorf("getInfoFromOne wrong err: %s", err.Error())
+		return err
+	}
+	lastNumber = newLastNumber
+	node = writeInfoToNode(node, objectID, path, lineNumber, value)
+	err = node.writeNodeToFile(dirPath)
+	if err != nil {
+		err = fmt.Errorf("node.writeToFile wrong err: %s", err.Error())
+		return err
 	}
 	return nil
 }
