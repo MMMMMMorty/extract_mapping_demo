@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
+	"src/main/pkg/yqlib"
 	"strconv"
 	"strings"
 )
@@ -62,9 +65,7 @@ func getInfo(dirPath string) error {
 		} else if isEmpty == false {
 			// not sure if it can go to the end
 			index = index - 3
-			command := `'[..| select(line == ` + strconv.Itoa(index) + `)| {"destpath": path | join("."),"type": type,"value": .}]'`
-			yqCommand := fmt.Sprintf("yq %s %s", command, resultPath)
-			out, _ := Exec(yqCommand)
+			out := getYamlLineInfo(index, resultPath)
 			if out != nil {
 				output := out.String()
 				// fmt.Println(output)
@@ -75,7 +76,7 @@ func getInfo(dirPath string) error {
 						err := fmt.Errorf("There is no objectID info")
 						return err
 					}
-					splits := strings.Split(output, "- dest")
+					splits := strings.Split(output, "dest")
 					if len(splits) < 2 {
 						err := fmt.Errorf("Something wrong with the length of the splits, which is %d", len(splits))
 						return err
@@ -90,12 +91,14 @@ func getInfo(dirPath string) error {
 								err = fmt.Errorf("regexp.MatchString err: %s", err.Error())
 							}
 							if mapMatched {
-								err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, true)
+								newlastNumber, err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, true)
+								lastNumber = newlastNumber
 								if err != nil {
 									err = fmt.Errorf("map type: writeNodeToFile wrong err: %s", err.Error())
 								}
 							} else {
-								err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, false)
+								newlastNumber, err := writeNodeToFile(reValue, reLine, split, lastNumber, path, dirPath, node, objectID, false)
+								lastNumber = newlastNumber
 								if err != nil {
 									err = fmt.Errorf("not map type: writeNodeToFile wrong err: %s", err.Error())
 								}
@@ -111,20 +114,20 @@ func getInfo(dirPath string) error {
 	return nil
 }
 
-func writeNodeToFile(reValue *regexp.Regexp, reLine *regexp.Regexp, split string, lastNumber int, path string, dirPath string, node *Node, objectID *ObjectID, isMapType bool) error {
+func writeNodeToFile(reValue *regexp.Regexp, reLine *regexp.Regexp, split string, lastNumber int, path string, dirPath string, node *Node, objectID *ObjectID, isMapType bool) (int, error) {
 	value, lineNumber, newLastNumber, err := getInfoFromOne(reValue, reLine, split, lastNumber, isMapType)
 	if err != nil {
 		err = fmt.Errorf("getInfoFromOne wrong err: %s", err.Error())
-		return err
+		return -1, err
 	}
 	lastNumber = newLastNumber
 	node = writeInfoToNode(node, objectID, path, lineNumber, value)
 	err = node.writeNodeToFile(dirPath)
 	if err != nil {
 		err = fmt.Errorf("node.writeToFile wrong err: %s", err.Error())
-		return err
+		return -1, err
 	}
-	return nil
+	return lastNumber, nil
 }
 
 func getInfoFromOne(reValue *regexp.Regexp, reLine *regexp.Regexp, output string, lastNumber int, isMapType bool) (value string, lineNumber int, newLastNumber int, err error) {
@@ -159,4 +162,42 @@ func writeInfoToNode(node *Node, objectID *ObjectID, path string, lineNumber int
 	node.objectID = objectID
 	node.value = value
 	return node
+}
+
+func getYamlLineInfo(index int, yamlFile string) *bytes.Buffer {
+	expression := `..| select(line == ` + strconv.Itoa(index) + `)| {"destpath": path | join("."),"type": type,"value": .}`
+	out, err := exectuateYq(expression, yamlFile)
+	if err != nil {
+		err = fmt.Errorf("exectuateYq err: %s", err.Error())
+	}
+	return out
+}
+
+func getYamlLineInfoByYq(index int, yamlFile string) *bytes.Buffer {
+	expression := `'..| select(line == ` + strconv.Itoa(index) + `)| {"destpath": path | join("."),"type": type,"value": .}'`
+	yqCommand := fmt.Sprintf("yq %s %s", expression, yamlFile)
+	out, _ := Exec(yqCommand)
+	return out
+}
+
+func exectuateYq(expression string, yamlFile string) (*bytes.Buffer, error) {
+	var args []string
+	args = append(args, yamlFile)
+
+	out := new(bytes.Buffer)
+	printerWriter := configurePrinterWriter(out) //NewSinglePrinterWriter
+
+	encoder := configureEncoder() //NewYamlEncoder
+
+	printer := yqlib.NewPrinter(encoder, printerWriter) // resultsPrinter
+
+	decoder := configureDecoder(false)
+
+	streamEvaluator := yqlib.NewStreamEvaluator()
+
+	err := streamEvaluator.EvaluateFiles(expression, args, printer, decoder) // (expression, args, printer, decoder)!!!
+	if err == nil && !printer.PrintedAnything() {
+		return nil, errors.New("no matches found")
+	}
+	return out, err
 }

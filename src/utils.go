@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os/exec"
+	"src/main/pkg/yqlib"
 	"strings"
 )
 
@@ -36,4 +38,25 @@ func Exec(cmd string) (*bytes.Buffer, error) {
 		return out, err
 	}
 	return out, nil
+}
+
+func configurePrinterWriter(out io.Writer) yqlib.PrinterWriter {
+	var printerWriter yqlib.PrinterWriter
+	printerWriter = yqlib.NewSinglePrinterWriter(out)
+
+	return printerWriter
+}
+
+func configureEncoder() yqlib.Encoder {
+	indent := 2
+	colorsEnabled := false
+	yqlibEncoder := yqlib.NewYamlEncoder(indent, colorsEnabled, yqlib.ConfiguredYamlPreferences)
+	return yqlibEncoder
+}
+
+func configureDecoder(evaluateTogether bool) yqlib.Decoder {
+	prefs := yqlib.ConfiguredYamlPreferences
+	prefs.EvaluateTogether = evaluateTogether
+	yqlibDecoder := yqlib.NewYamlDecoder(prefs)
+	return yqlibDecoder
 }
