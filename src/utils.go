@@ -7,8 +7,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os/exec"
-	"src/main/pkg/yqlib"
 	"strings"
+
+	"github.com/mikefarah/yq/v4/pkg/yqlib"
 )
 
 func ReadLines(filePath string) ([]string, string, error) {

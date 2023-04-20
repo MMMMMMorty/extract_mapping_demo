@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"src/main/pkg/yqlib"
 	"strconv"
 	"strings"
+
+	"github.com/mikefarah/yq/v4/pkg/yqlib"
 )
 
 // change to use go func
@@ -26,10 +27,11 @@ func getInfo(dirPath string) error {
 	reValue := regexp.MustCompile(`value: (?P<value>\[.+\]|\S*)`)
 	reLine := regexp.MustCompile(`This is the (?P<line>\d*) line`)
 	lastNumber := -1
-	isEmpty := true
-
+	isApiVersionEmpty := true
+	isKindEmpty := true
 	node := new(Node)
 	objectID := new(ObjectID)
+	reducedNumber := -1 // uses to make sure line and line in yq is the same
 
 	for index, line := range lines {
 		if soueceFileRe.MatchString(line) {
@@ -41,7 +43,8 @@ func getInfo(dirPath string) error {
 			node = new(Node)
 			objectID = new(ObjectID)
 			node.file = fileName
-			isEmpty = true
+			isApiVersionEmpty = true
+			isKindEmpty = true
 			lastNumber = -1
 			continue
 		} else if apiVersionRe.MatchString(line) {
@@ -51,7 +54,10 @@ func getInfo(dirPath string) error {
 				return err
 			}
 			objectID.apiVersion = apiVersion
-			isEmpty = false
+			isApiVersionEmpty = false
+			if reducedNumber == -1 {
+				reducedNumber = index + reducedNumber
+			}
 			continue
 		} else if kindRe.MatchString(line) {
 			kind := extractParameter(kindRe, line, "$kind")
@@ -60,11 +66,11 @@ func getInfo(dirPath string) error {
 				return err
 			}
 			objectID.kind = kind
-			isEmpty = false
+			isKindEmpty = false
 			continue
-		} else if isEmpty == false {
+		} else if isApiVersionEmpty == false || isKindEmpty == false {
 			// not sure if it can go to the end
-			index = index - 3
+			index = index - reducedNumber
 			out := getYamlLineInfo(index, resultPath)
 			if out != nil {
 				output := out.String()
@@ -72,8 +78,8 @@ func getInfo(dirPath string) error {
 				path := extractParameter(rePath, output, "$path")
 				//if path is empty, continue
 				if path != "" && path != "\"\"" {
-					if isEmpty == true {
-						err := fmt.Errorf("There is no objectID info")
+					if isApiVersionEmpty == true || isKindEmpty == true {
+						err := fmt.Errorf("There is no enough objectID info")
 						return err
 					}
 					splits := strings.Split(output, "dest")
@@ -108,7 +114,6 @@ func getInfo(dirPath string) error {
 					}
 				}
 			}
-
 		}
 	}
 	return nil
@@ -193,9 +198,12 @@ func exectuateYq(expression string, yamlFile string) (*bytes.Buffer, error) {
 
 	decoder := configureDecoder(false)
 
-	streamEvaluator := yqlib.NewStreamEvaluator()
+	allAtOnceEvaluator := yqlib.NewAllAtOnceEvaluator()
 
-	err := streamEvaluator.EvaluateFiles(expression, args, printer, decoder) // (expression, args, printer, decoder)!!!
+	// streamEvaluator := yqlib.NewStreamEvaluator()
+	// yqlib.InitExpressionParser()
+
+	err := allAtOnceEvaluator.EvaluateFiles(expression, args, printer, decoder) // (expression, args, printer, decoder)!!!
 	if err == nil && !printer.PrintedAnything() {
 		return nil, errors.New("no matches found")
 	}
