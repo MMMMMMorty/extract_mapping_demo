@@ -25,13 +25,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("addCommentToFile: %s", err)
 	}
-	out, err := exec.Command("/bin/helm", "template", path, "--debug").Output()
+	out, err := exec.Command("helm", "template", path, "--debug").Output()
 	if err != nil {
 		log.Fatalf("Helm template command: %s", err.Error())
 	}
 	err = writeToFile(resultPath, string(out))
 	if err != nil {
-		log.Fatalf("wWiteToFile: %s", err)
+		log.Fatalf("WiteToFile: %s", err)
 	}
 	err = getInfo(resultPath)
 	if err != nil {
